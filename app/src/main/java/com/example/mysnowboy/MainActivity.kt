@@ -1,5 +1,6 @@
 package com.example.mysnowboy
 
+import ai.kitt.snowboy.MsgEnum.MSG_ACTIVE
 import android.annotation.SuppressLint
 import android.media.AudioManager
 import android.os.Bundle
@@ -12,14 +13,16 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.mysnowboy.MsgEnum.MSG_ACTIVE
-import com.example.mysnowboy.MsgEnum.MSG_ERROR
-import com.example.mysnowboy.MsgEnum.MSG_INFO
-import com.example.mysnowboy.MsgEnum.MSG_VAD_NOSPEECH
-import com.example.mysnowboy.MsgEnum.MSG_VAD_SPEECH
-import com.example.mysnowboy.audio.AudioDataSaver
-import com.example.mysnowboy.audio.PlaybackThread
-import com.example.mysnowboy.audio.RecordingThread
+import ai.kitt.snowboy.AppResCopy
+import ai.kitt.snowboy.MsgEnum
+import ai.kitt.snowboy.MsgEnum.MSG_ACTIVE
+import ai.kitt.snowboy.MsgEnum.MSG_ERROR
+import ai.kitt.snowboy.MsgEnum.MSG_INFO
+import ai.kitt.snowboy.MsgEnum.MSG_VAD_NOSPEECH
+import ai.kitt.snowboy.MsgEnum.MSG_VAD_SPEECH
+import ai.kitt.snowboy.audio.AudioDataSaver
+import ai.kitt.snowboy.audio.PlaybackThread
+import ai.kitt.snowboy.audio.RecordingThread
 
 class MainActivity : AppCompatActivity() {
     private var record_button: Button? = null
@@ -41,15 +44,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main)
-        setUI()
-
-        setProperVolume()
-
-        AppResCopy.copyResFromAssetsToSD(this)
-
-        activeTimes = 0
-        recordingThread = RecordingThread(handle, AudioDataSaver())
-        playbackThread = PlaybackThread()
+//        setUI()
+//
+//        setProperVolume()
+//
+//        AppResCopy.copyResFromAssetsToSD(this)
+//
+//        activeTimes = 0
+//        recordingThread = RecordingThread(handle, AudioDataSaver())
+//        playbackThread = PlaybackThread()
     }
 
     fun showToast(msg: CharSequence?) {

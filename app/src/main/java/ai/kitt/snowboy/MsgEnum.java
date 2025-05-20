@@ -1,6 +1,6 @@
-package com.example.mysnowboy
+package ai.kitt.snowboy;
 
-enum class MsgEnum {
+public enum  MsgEnum {
     MSG_VAD_END,
     MSG_VAD_NOSPEECH,
     MSG_VAD_SPEECH,
@@ -12,9 +12,7 @@ enum class MsgEnum {
     MSG_ERROR,
     MSG_INFO;
 
-    companion object {
-        fun getMsgEnum(i: Int): MsgEnum? {
-            return MsgEnum.entries[i]
-        }
+    public static MsgEnum getMsgEnum(int i) {
+        return MsgEnum.values()[i];
     }
 }
