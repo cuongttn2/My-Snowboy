@@ -5,233 +5,155 @@ import ai.kitt.snowboy.MsgEnum
 import ai.kitt.snowboy.audio.AudioDataSaver
 import ai.kitt.snowboy.audio.PlaybackThread
 import ai.kitt.snowboy.audio.RecordingThread
-import android.media.AudioManager
-import android.os.Bundle
-import android.os.Handler
-import android.os.Message
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.*
 import android.text.Html
-import android.view.View
-import android.view.View.OnClickListener
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
-    private var record_button: Button? = null
-    private var play_button: Button? = null
-    private var log: TextView? = null
-    private var logView: ScrollView? = null
-    private var preVolume = -1
 
-    companion object {
-        var strLog: String? = null
-        private var activeTimes: Long = 0
-        var MAX_LOG_LINE_NUM: Int = 200
+    private lateinit var recordButton: Button
+    private lateinit var playButton: Button
+    private lateinit var logView: TextView
+    private lateinit var logScroll: ScrollView
+
+    private lateinit var audioSaver: AudioDataSaver
+    private lateinit var recordingThread: RecordingThread
+    private lateinit var playbackThread: PlaybackThread
+
+    // t? qu?n lý tr?ng thái
+    private var isRecording = false
+    private var isPlaying   = false
+
+    // Permission launcher
+    private val micPermissionLaunch =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startRecording()
+            else Toast.makeText(this, "C?n quy?n mic ?? ho?t ??ng", Toast.LENGTH_SHORT).show()
+        }
+
+    // Handler nh?n MsgEnum t? RecordingThread
+    private val handler = object : Handler(Looper.getMainLooper()) {
+        override fun handleMessage(msg: Message) {
+            when (MsgEnum.values()[msg.what]) {
+                MsgEnum.MSG_ACTIVE -> {
+                    appendLog("Hotword detected!", "green")
+                    Toast.makeText(this@MainActivity, "Hotword!", Toast.LENGTH_SHORT).show()
+                }
+                MsgEnum.MSG_ERROR -> appendLog("Detection error", "red")
+                else             -> { /* b? qua */ }
+            }
+        }
     }
 
-    private var recordingThread: RecordingThread? = null
-    private var playbackThread: PlaybackThread? = null
-
-    public override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContentView(R.layout.activity_main)
-        setUI()
 
-        setProperVolume()
+        // bind UI
+        recordButton = findViewById(R.id.btn_test1)
+        playButton   = findViewById(R.id.btn_test2)
+        logView      = findViewById(R.id.log)
+        logScroll    = findViewById(R.id.logView)
 
-        AppResCopy.copyResFromAssetsToSD(this)
+        recordButton.setOnClickListener { onRecordClicked() }
+        playButton  .setOnClickListener { onPlayClicked() }
+        recordButton.isEnabled = true
+        playButton  .isEnabled = true
 
-        activeTimes = 0
-        recordingThread = RecordingThread(handle, AudioDataSaver())
-        playbackThread = PlaybackThread()
+        // copy snowboy assets ? internal
+        AppResCopy.copyResToInternal(this)
+
+        // kh?i t?o AudioDataSaver KHÔNG truy?n tham s?
+        audioSaver = AudioDataSaver(this)
+
+        // kh?i t?o threads
+        recordingThread = RecordingThread(this, handler, audioSaver)
+        playbackThread  = PlaybackThread(this)
     }
 
-    fun showToast(msg: CharSequence?) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun setUI() {
-        record_button = findViewById<View?>(R.id.btn_test1) as Button
-        record_button!!.setOnClickListener(record_button_handle)
-        record_button!!.setEnabled(true)
-
-        play_button = findViewById<View?>(R.id.btn_test2) as Button
-        play_button!!.setOnClickListener(play_button_handle)
-        play_button!!.setEnabled(true)
-
-        log = findViewById<View?>(R.id.log) as TextView
-        logView = findViewById<View?>(R.id.logView) as ScrollView
-    }
-
-    private fun setMaxVolume() {
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        preVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        updateLog(" ----> preVolume = " + preVolume, "green")
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        updateLog(" ----> maxVolume = " + maxVolume, "green")
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
-        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        updateLog(" ----> currentVolume = " + currentVolume, "green")
-    }
-
-    private fun setProperVolume() {
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        preVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        updateLog(" ----> preVolume = " + preVolume, "green")
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        updateLog(" ----> maxVolume = " + maxVolume, "green")
-        val properVolume = (maxVolume.toFloat() * 0.2).toInt()
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, properVolume, 0)
-        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        updateLog(" ----> currentVolume = " + currentVolume, "green")
-    }
-
-    private fun restoreVolume() {
-        if (preVolume >= 0) {
-            val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, preVolume, 0)
-            updateLog(" ----> set preVolume = " + preVolume, "green")
-            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            updateLog(" ----> currentVolume = " + currentVolume, "green")
+    private fun onRecordClicked() {
+        if (!isRecording) {
+            // n?u ch?a có quy?n thì request
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                micPermissionLaunch.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                startRecording()
+            }
+        } else {
+            stopRecording()
         }
     }
 
     private fun startRecording() {
-        recordingThread!!.startRecording()
-        updateLog(" ----> recording started ...", "green")
-        record_button!!.setText(R.string.btn1_stop)
+        // d?ng playback n?u ?ang ch?y
+        if (isPlaying) stopPlayback()
+
+        recordingThread.startRecording()
+        isRecording = true
+        recordButton.text = getString(R.string.btn1_stop)
+        appendLog("Recording started", "white")
     }
 
     private fun stopRecording() {
-        recordingThread!!.stopRecording()
-        updateLog(" ----> recording stopped ", "green")
-        record_button!!.setText(R.string.btn1_start)
+        recordingThread.stopRecording()
+        isRecording = false
+        recordButton.text = getString(R.string.btn1_start)
+        appendLog("Recording stopped", "white")
+    }
+
+    private fun onPlayClicked() {
+        if (!isPlaying) {
+            // d?ng ghi n?u ?ang ch?y
+            if (isRecording) stopRecording()
+            startPlayback()
+        } else {
+            stopPlayback()
+        }
     }
 
     private fun startPlayback() {
-        updateLog(" ----> playback started ...", "green")
-        play_button!!.setText(R.string.btn2_stop)
-        // (new PcmPlayer()).playPCM();
-        playbackThread!!.startPlayback()
+        playbackThread.startPlayback()
+        isPlaying = true
+        playButton.text = getString(R.string.btn2_stop)
+        appendLog("Playback started", "white")
     }
 
     private fun stopPlayback() {
-        updateLog(" ----> playback stopped ", "green")
-        play_button!!.setText(R.string.btn2_start)
-        playbackThread!!.stopPlayback()
+        playbackThread.stopPlayback()
+        isPlaying = false
+        playButton.text = getString(R.string.btn2_start)
+        appendLog("Playback stopped", "white")
     }
 
-    private fun sleep() {
-        try {
-            Thread.sleep(500)
-        } catch (e: Exception) {
+    private fun appendLog(text: String, color: String) {
+        // Gi?i h?n 200 dòng
+        val sb = StringBuilder(strLog ?: "")
+        if (sb.lineSequence().count() >= 200) {
+            // c?t dòng ??u
+            val idx = sb.indexOf("<br>")
+            if (idx >= 0) sb.delete(0, idx + 4)
         }
+        sb.append("<font color='$color'>$text</font><br>")
+        strLog = sb.toString()
+        logView.text = Html.fromHtml(strLog, Html.FROM_HTML_MODE_LEGACY)
+        logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
     }
 
-    private val record_button_handle: OnClickListener = object : OnClickListener {
-        override
-        fun onClick(arg0: View?) {
-            if (record_button!!.getText() == getResources().getString(R.string.btn1_start)) {
-                stopPlayback()
-                sleep()
-                startRecording()
-            } else {
-                stopRecording()
-                sleep()
-            }
-        }
-    }
+    private var strLog: String? = null
 
-    private val play_button_handle: OnClickListener = object : OnClickListener {
-        override
-        fun onClick(arg0: View?) {
-            if (play_button!!.getText() == getResources().getString(R.string.btn2_start)) {
-                stopRecording()
-                sleep()
-                startPlayback()
-            } else {
-                stopPlayback()
-            }
-        }
-    }
-
-    var handle: Handler = object : Handler() {
-        override fun handleMessage(msg: Message) {
-            val message = MsgEnum.getMsgEnum(msg.what)
-            when (message) {
-                MsgEnum.MSG_ACTIVE -> {
-                    activeTimes++
-                    updateLog(" ----> Detected " + activeTimes + " times", "green")
-                    // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
-                    showToast("Active " + activeTimes)
-                }
-
-                MsgEnum.MSG_INFO -> updateLog(" ----> " + message)
-                MsgEnum.MSG_VAD_SPEECH -> updateLog(" ----> normal voice", "blue")
-                MsgEnum.MSG_VAD_NOSPEECH -> updateLog(" ----> no speech", "blue")
-                MsgEnum.MSG_ERROR -> updateLog(" ----> " + msg.toString(), "red")
-                else -> super.handleMessage(msg)
-            }
-        }
-    }
-
-    fun updateLog(text: String) {
-        log!!.post(object : Runnable {
-            override fun run() {
-                if (currLogLineNum >= MAX_LOG_LINE_NUM) {
-                    val st = strLog!!.indexOf("<br>")
-                    strLog = strLog!!.substring(st + 4)
-                } else {
-                    currLogLineNum++
-                }
-                val str = "<font color='white'>" + text + "</font>" + "<br>"
-                strLog = if (strLog == null || strLog!!.length == 0) str else strLog + str
-                log!!.setText(Html.fromHtml(strLog))
-            }
-        })
-        logView!!.post(object : Runnable {
-            override fun run() {
-                logView!!.fullScroll(ScrollView.FOCUS_DOWN)
-            }
-        })
-    }
-
-
-    var currLogLineNum: Int = 0
-
-    fun updateLog(text: String?, color: String) {
-        log!!.post(object : Runnable {
-            override fun run() {
-                if (currLogLineNum >= MAX_LOG_LINE_NUM) {
-                    val st = strLog!!.indexOf("<br>")
-                    strLog = strLog!!.substring(st + 4)
-                } else {
-                    currLogLineNum++
-                }
-                val str = "<font color='" + color + "'>" + text + "</font>" + "<br>"
-                strLog = if (strLog == null || strLog!!.length == 0) str else strLog + str
-                log!!.setText(Html.fromHtml(strLog))
-            }
-        })
-        logView!!.post(object : Runnable {
-            override fun run() {
-                logView!!.fullScroll(ScrollView.FOCUS_DOWN)
-            }
-        })
-    }
-
-    private fun emptyLog() {
-        strLog = null
-        log!!.setText("")
-    }
-
-    public override fun onDestroy() {
-        restoreVolume()
-        recordingThread!!.stopRecording()
+    override fun onDestroy() {
+        recordingThread.stopRecording()
+        playbackThread.stopPlayback()
         super.onDestroy()
     }
 }
