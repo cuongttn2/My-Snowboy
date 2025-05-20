@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">MySnowboy</string>
+    <string name="btn2_start">Play2</string>
+    <string name="btn1_start">Start</string>
+    <string name="btn2_stop">Stop 2</string>
+    <string name="btn1_stop">Stop 1</string>
+</resources>
