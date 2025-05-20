@@ -1,41 +1,36 @@
 package com.example.mysnowboy
 
-import ai.kitt.snowboy.MsgEnum.MSG_ACTIVE
-import android.annotation.SuppressLint
+import ai.kitt.snowboy.AppResCopy
+import ai.kitt.snowboy.MsgEnum
+import ai.kitt.snowboy.audio.AudioDataSaver
+import ai.kitt.snowboy.audio.PlaybackThread
+import ai.kitt.snowboy.audio.RecordingThread
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
 import android.text.Html
 import android.view.View
+import android.view.View.OnClickListener
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import ai.kitt.snowboy.AppResCopy
-import ai.kitt.snowboy.MsgEnum
-import ai.kitt.snowboy.MsgEnum.MSG_ACTIVE
-import ai.kitt.snowboy.MsgEnum.MSG_ERROR
-import ai.kitt.snowboy.MsgEnum.MSG_INFO
-import ai.kitt.snowboy.MsgEnum.MSG_VAD_NOSPEECH
-import ai.kitt.snowboy.MsgEnum.MSG_VAD_SPEECH
-import ai.kitt.snowboy.audio.AudioDataSaver
-import ai.kitt.snowboy.audio.PlaybackThread
-import ai.kitt.snowboy.audio.RecordingThread
+
 
 class MainActivity : AppCompatActivity() {
     private var record_button: Button? = null
     private var play_button: Button? = null
     private var log: TextView? = null
     private var logView: ScrollView? = null
-
-    var strLog: String? = null
-
     private var preVolume = -1
 
-    private
-    var activeTimes: Long = 0
+    companion object {
+        var strLog: String? = null
+        private var activeTimes: Long = 0
+        var MAX_LOG_LINE_NUM: Int = 200
+    }
 
     private var recordingThread: RecordingThread? = null
     private var playbackThread: PlaybackThread? = null
@@ -44,15 +39,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main)
-//        setUI()
-//
-//        setProperVolume()
-//
-//        AppResCopy.copyResFromAssetsToSD(this)
-//
-//        activeTimes = 0
-//        recordingThread = RecordingThread(handle, AudioDataSaver())
-//        playbackThread = PlaybackThread()
+        setUI()
+
+        setProperVolume()
+
+        AppResCopy.copyResFromAssetsToSD(this)
+
+        activeTimes = 0
+        recordingThread = RecordingThread(handle, AudioDataSaver())
+        playbackThread = PlaybackThread()
     }
 
     fun showToast(msg: CharSequence?) {
@@ -106,28 +101,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startRecording() {
-        recordingThread?.startRecording()
+        recordingThread!!.startRecording()
         updateLog(" ----> recording started ...", "green")
-        record_button?.setText(R.string.btn1_stop)
+        record_button!!.setText(R.string.btn1_stop)
     }
 
     private fun stopRecording() {
-        recordingThread?.stopRecording()
+        recordingThread!!.stopRecording()
         updateLog(" ----> recording stopped ", "green")
         record_button!!.setText(R.string.btn1_start)
     }
 
     private fun startPlayback() {
         updateLog(" ----> playback started ...", "green")
-        play_button?.setText(R.string.btn2_stop)
+        play_button!!.setText(R.string.btn2_stop)
         // (new PcmPlayer()).playPCM();
-        playbackThread?.startPlayback()
+        playbackThread!!.startPlayback()
     }
 
     private fun stopPlayback() {
         updateLog(" ----> playback stopped ", "green")
         play_button!!.setText(R.string.btn2_start)
-        playbackThread?.stopPlayback()
+        playbackThread!!.stopPlayback()
     }
 
     private fun sleep() {
@@ -137,9 +132,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val record_button_handle: View.OnClickListener = object : View.OnClickListener {
-        // @Override
-        override fun onClick(arg0: View?) {
+    private val record_button_handle: OnClickListener = object : OnClickListener {
+        override
+        fun onClick(arg0: View?) {
             if (record_button!!.getText() == getResources().getString(R.string.btn1_start)) {
                 stopPlayback()
                 sleep()
@@ -151,9 +146,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val play_button_handle: View.OnClickListener = object : View.OnClickListener {
-        // @Override
-        override fun onClick(arg0: View?) {
+    private val play_button_handle: OnClickListener = object : OnClickListener {
+        override
+        fun onClick(arg0: View?) {
             if (play_button!!.getText() == getResources().getString(R.string.btn2_start)) {
                 stopRecording()
                 sleep()
@@ -164,22 +159,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    var handle: Handler = @SuppressLint("HandlerLeak")
-    object : Handler() {
+    var handle: Handler = object : Handler() {
         override fun handleMessage(msg: Message) {
             val message = MsgEnum.getMsgEnum(msg.what)
             when (message) {
-                MSG_ACTIVE -> {
+                MsgEnum.MSG_ACTIVE -> {
                     activeTimes++
                     updateLog(" ----> Detected " + activeTimes + " times", "green")
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     showToast("Active " + activeTimes)
                 }
 
-                MSG_INFO -> updateLog(" ----> " + message)
-                MSG_VAD_SPEECH -> updateLog(" ----> normal voice", "blue")
-                MSG_VAD_NOSPEECH -> updateLog(" ----> no speech", "blue")
-                MSG_ERROR -> updateLog(" ----> " + msg.toString(), "red")
+                MsgEnum.MSG_INFO -> updateLog(" ----> " + message)
+                MsgEnum.MSG_VAD_SPEECH -> updateLog(" ----> normal voice", "blue")
+                MsgEnum.MSG_VAD_NOSPEECH -> updateLog(" ----> no speech", "blue")
+                MsgEnum.MSG_ERROR -> updateLog(" ----> " + msg.toString(), "red")
                 else -> super.handleMessage(msg)
             }
         }
@@ -206,8 +200,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-
-    var MAX_LOG_LINE_NUM: Int = 200
 
     var currLogLineNum: Int = 0
 
@@ -239,7 +231,7 @@ class MainActivity : AppCompatActivity() {
 
     public override fun onDestroy() {
         restoreVolume()
-        recordingThread?.stopRecording()
+        recordingThread!!.stopRecording()
         super.onDestroy()
     }
 }

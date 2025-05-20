@@ -2,7 +2,6 @@ package ai.kitt.snowboy;
 
 import android.content.Context;
 import android.util.Log;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -25,7 +24,7 @@ public class AppResCopy {
                         Log.i(TAG, "mkdir ok: "+sdcardDstDir);
                     }
                 } else {
-                     Log.w(TAG, sdcardDstDir+" already exists! ");
+                    Log.w(TAG, sdcardDstDir+" already exists! ");
                 }
                 for (String fileName : fileNames) {
                     copyFilesFromAssets(context,assetsSrcDir + "/" + fileName,sdcardDstDir+"/"+fileName, override);

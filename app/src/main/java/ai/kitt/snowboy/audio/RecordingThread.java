@@ -1,19 +1,21 @@
 package ai.kitt.snowboy.audio;
 
-import android.media.AudioFormat;
-import android.media.AudioRecord;
-import android.media.MediaPlayer;
-import android.media.MediaRecorder;
-import android.os.Handler;
-import android.os.Message;
-import android.util.Log;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import ai.kitt.snowboy.Constants;
 import ai.kitt.snowboy.MsgEnum;
+
+import android.annotation.SuppressLint;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
+import android.media.MediaPlayer;
+import android.os.Handler;
+import android.os.Message;
+import android.util.Log;
+
 import ai.kitt.snowboy.SnowboyDetect;
 
 public class RecordingThread {
@@ -22,19 +24,17 @@ public class RecordingThread {
     private static final String TAG = RecordingThread.class.getSimpleName();
 
     private static final String ACTIVE_RES = Constants.ACTIVE_RES;
-    private static final String APPU_UMDL = Constants.APPU_UMDL;
-    private static final String ALEXA_UMDL = Constants.ALEXA_UMDL;
-    private static final String JARVIS_UMDL = Constants.JARVIS_UMDL;
-    
+    private static final String ACTIVE_UMDL = Constants.ACTIVE_UMDL;
+
     private boolean shouldContinue;
     private AudioDataReceivedListener listener = null;
     private Handler handler = null;
     private Thread thread;
-    
+
     private static String strEnvWorkSpace = Constants.DEFAULT_WORK_SPACE;
-    private String activeModel = strEnvWorkSpace+APPU_UMDL+','+strEnvWorkSpace+ALEXA_UMDL;//+','+strEnvWorkSpace+JARVIS_UMDL;
-    private String commonRes = strEnvWorkSpace+ACTIVE_RES;   
-    
+    private String activeModel = strEnvWorkSpace+ACTIVE_UMDL;
+    private String commonRes = strEnvWorkSpace+ACTIVE_RES;
+
     private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel);
     private MediaPlayer player = new MediaPlayer();
 
@@ -42,11 +42,11 @@ public class RecordingThread {
         this.handler = handler;
         this.listener = listener;
 
-        detector.SetSensitivity("0.3,0.5");
+        detector.SetSensitivity("0.6");
         detector.SetAudioGain(1);
-        detector.ApplyFrontend(false);
+        detector.ApplyFrontend(true);
         try {
-            player.setDataSource(strEnvWorkSpace+"IronmanRepulsor.wav");
+            player.setDataSource(strEnvWorkSpace+"ding.wav");
             player.prepare();
         } catch (IOException e) {
             Log.e(TAG, "Playing ding sound error", e);
@@ -93,12 +93,12 @@ public class RecordingThread {
         }
 
         byte[] audioBuffer = new byte[bufferSize];
-        AudioRecord record = new AudioRecord(
-            MediaRecorder.AudioSource.DEFAULT,
-            Constants.SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferSize);
+        @SuppressLint("MissingPermission") AudioRecord record = new AudioRecord(
+                MediaRecorder.AudioSource.DEFAULT,
+                Constants.SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferSize);
 
         if (record.getState() != AudioRecord.STATE_INITIALIZED) {
             Log.e(TAG, "Audio Record can't initialize!");
@@ -118,7 +118,7 @@ public class RecordingThread {
             if (null != listener) {
                 listener.onAudioDataReceived(audioBuffer, audioBuffer.length);
             }
-            
+
             // Converts to short array.
             short[] audioData = new short[audioBuffer.length / 2];
             ByteBuffer.wrap(audioBuffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(audioData);
@@ -136,20 +136,11 @@ public class RecordingThread {
             } else if (result == 0) {
                 // post a higher CPU usage:
                 // sendMessage(MsgEnum.MSG_VAD_SPEECH, null);
-            } else if (result == 1) {
+            } else if (result > 0) {
                 sendMessage(MsgEnum.MSG_ACTIVE, null);
-                Log.i("Appu: ", "Hotword " + Integer.toString(result) + " detected!");
-                player.start();
-            } else if (result == 2) {
-                sendMessage(MsgEnum.MSG_ACTIVE, null);
-                Log.i("Alexa: ", "Hotword " + Integer.toString(result) + " detected!");
+                Log.i("Snowboy: ", "Hotword " + Integer.toString(result) + " detected!");
                 player.start();
             }
-//            else if (result == 3) {
-//                sendMessage(MsgEnum.MSG_ACTIVE, null);
-//                Log.i("JARVIS: ", "Hotword " + Integer.toString(result) + " detected!");
-//                player.start();
-//            }
         }
 
         record.stop();
